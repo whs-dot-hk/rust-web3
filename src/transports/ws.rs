@@ -213,44 +213,45 @@ impl WsServerTask {
         pin_mut!(requests);
         loop {
             select! {
-                msg = requests.next() => match msg {
-                    Some(TransportMessage::Request { id, request, sender: tx }) => {
-                        if pending.insert(id, tx).is_some() {
-                            log::warn!("Replacing a pending request with id {:?}", id);
-                        }
-                        let res = sender.send_text(request).await;
-                        let res2 = sender.flush().await;
-                        if let Err(e) = res.and(res2) {
-                            // TODO [ToDr] Re-connect.
-                            log::error!("WS connection error: {:?}", e);
-                            pending.remove(&id);
-                        }
-                        sender.close().await.expect("Fail to close WS")
-                    }
-                    Some(TransportMessage::Subscribe { id, sink }) => {
-                        if subscriptions.insert(id.clone(), sink).is_some() {
-                            log::warn!("Replacing already-registered subscription with id {:?}", id);
-                        }
-                    }
-                    Some(TransportMessage::Unsubscribe { id }) => {
-                        if subscriptions.remove(&id).is_none() {
-                            log::warn!("Unsubscribing from non-existent subscription with id {:?}", id);
-                        }
-                    }
-                    None => {}
-                },
-                res = receiver.next() => match res {
-                    Some(Ok(data)) => {
-                        handle_message(&data, &subscriptions, &mut pending);
-                    },
-                    Some(Err(e)) => {
-                        log::error!("WS connection error: {:?}", e);
-                        break;
-                    },
-                    None => break,
-                },
-                complete => break,
+                            msg = requests.next() => match msg {
+                                Some(TransportMessage::Request { id, request, sender: tx }) => {
+                                    if pending.insert(id, tx).is_some() {
+                                        log::warn!("Replacing a pending request with id {:?}", id);
+                                    }
+                                    let res = sender.send_text(request).await;
+                                    let res2 = sender.flush().await;
+                                    if let Err(e) = res.and(res2) {
+                                        // TODO [ToDr] Re-connect.
+                                        log::error!("WS connection error: {:?}", e);
+                                        pending.remove(&id);
+                                    }
+                                }
+                                Some(TransportMessage::Subscribe { id, sink }) => {
+                                    if subscriptions.insert(id.clone(), sink).is_some() {
+                                        log::warn!("Replacing already-registered subscription with id {:?}", id);
+                                    }
+                                }
+                                Some(TransportMessage::Unsubscribe { id }) => {
+                                    if subscriptions.remove(&id).is_none() {
+                                        log::warn!("Unsubscribing from non-existent subscription with id {:?}", id);
+                                    }
+                                }
+                                None => {
+                                    sender.close().await.expect("Fail to close WS")
             }
+                            },
+                            res = receiver.next() => match res {
+                                Some(Ok(data)) => {
+                                    handle_message(&data, &subscriptions, &mut pending);
+                                },
+                                Some(Err(e)) => {
+                                    log::error!("WS connection error: {:?}", e);
+                                    break;
+                                },
+                                None => break,
+                            },
+                            complete => break,
+                        }
         }
     }
 }
