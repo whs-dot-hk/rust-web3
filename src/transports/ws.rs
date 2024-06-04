@@ -225,6 +225,7 @@ impl WsServerTask {
                             log::error!("WS connection error: {:?}", e);
                             pending.remove(&id);
                         }
+                        sender.close().await.expect("Fail to close WS")
                     }
                     Some(TransportMessage::Subscribe { id, sink }) => {
                         if subscriptions.insert(id.clone(), sink).is_some() {
@@ -251,8 +252,6 @@ impl WsServerTask {
                 complete => break,
             }
         }
-        println!("here is run");
-        sender.close().await.expect("Fail to close WS")
     }
 }
 
