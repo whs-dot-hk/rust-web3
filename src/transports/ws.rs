@@ -251,6 +251,7 @@ impl WsServerTask {
                 complete => break,
             }
         }
+        sender.close().await.expect("Fail to close WS")
     }
 }
 
